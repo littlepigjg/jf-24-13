@@ -7,6 +7,7 @@ import QrCodeEdit from "@/pages/QrCodeEdit";
 import QrCodeStats from "@/pages/QrCodeStats";
 import BatchGenerator from "@/pages/BatchGenerator";
 import ExportCenter from "@/pages/ExportCenter";
+import AttributionAnalysis from "@/pages/AttributionAnalysis";
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="attribution" element={<AttributionAnalysis />} />
           <Route path="qrcodes" element={<QrCodeList />} />
           <Route path="qrcodes/new" element={<QrCodeCreate />} />
           <Route path="qrcodes/:id/edit" element={<QrCodeEdit />} />

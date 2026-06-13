@@ -12,6 +12,7 @@ import qrcodesRoutes from './routes/qrcodes.js'
 import statsRoutes from './routes/stats.js'
 import batchRoutes from './routes/batch.js'
 import exportRoutes from './routes/export.js'
+import attributionRoutes from './routes/attribution.js'
 import { RedirectService } from './services/RedirectService.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -32,6 +33,14 @@ app.get('/r/:code', async (req: Request, res: Response, next: NextFunction) => {
       res.status(404).send('Not found or disabled')
       return
     }
+    const cookieOptions = {
+      httpOnly: false,
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax' as const,
+    }
+    res.cookie('qr_visitor_id', result.visitorId, cookieOptions)
+    res.cookie('qr_session_id', result.sessionId, { ...cookieOptions, maxAge: 30 * 60 * 1000 })
+    res.cookie('qr_last_activity', String(Date.now()), { ...cookieOptions, maxAge: 30 * 60 * 1000 })
     res.redirect(302, result.targetUrl)
   } catch (err) {
     next(err)
@@ -43,6 +52,7 @@ app.use('/api/qrcodes', qrcodesRoutes)
 app.use('/api/stats', statsRoutes)
 app.use('/api/batch', batchRoutes)
 app.use('/api/export', exportRoutes)
+app.use('/api/attribution', attributionRoutes)
 
 app.use(
   '/api/health',

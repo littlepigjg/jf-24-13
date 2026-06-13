@@ -11,11 +11,13 @@ import {
   Zap,
   Bell,
   Search,
+  GitBranch,
 } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
   { to: "/dashboard", label: "仪表盘", icon: LayoutDashboard },
+  { to: "/attribution", label: "归因分析", icon: GitBranch },
   { to: "/qrcodes", label: "二维码列表", icon: QrCode },
   { to: "/qrcodes/new", label: "创建二维码", icon: PlusCircle },
   { to: "/batch", label: "批量生成", icon: Layers3 },
@@ -24,6 +26,7 @@ const navItems = [
 
 const breadcrumbMap: Record<string, { label: string; parent?: string }> = {
   dashboard: { label: "仪表盘" },
+  attribution: { label: "归因分析" },
   qrcodes: { label: "二维码列表" },
   new: { label: "创建二维码", parent: "qrcodes" },
   edit: { label: "编辑二维码", parent: "qrcodes" },
