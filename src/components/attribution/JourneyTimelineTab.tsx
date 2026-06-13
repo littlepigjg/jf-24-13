@@ -8,8 +8,13 @@ import {
   XCircle,
   MousePointerClick,
   ArrowRight,
+  RefreshCw,
+  AlertTriangle,
+  Calendar,
+  Filter,
 } from "lucide-react";
-import type { JourneyTimelineResult, FullJourneyStep } from "@shared/types";
+import type { JourneyTimelineResult, FullJourneyStep, AttributionModel } from "@shared/types";
+import { useJourneyTimeline, type UseJourneyTimelineOptions } from "@/hooks/useJourneyTimeline";
 
 function StepIcon({ stepType }: { stepType: string }) {
   switch (stepType) {
@@ -38,15 +43,42 @@ function StepBadge({ stepType }: { stepType: string }) {
 }
 
 export interface JourneyTimelineTabProps {
-  journeyTimeline: JourneyTimelineResult | null;
+  journeyTimeline?: JourneyTimelineResult | null;
   loading?: boolean;
+  error?: string | null;
+  onReload?: () => void;
+  standalone?: boolean;
+  standaloneOptions?: UseJourneyTimelineOptions;
+  showControls?: boolean;
+}
+
+function isDataEmpty(data: JourneyTimelineResult): boolean {
+  return (
+    data.totalJourneys === 0 &&
+    data.convertedJourneys === 0 &&
+    data.journeys.length === 0
+  );
 }
 
 export function JourneyTimelineTab({
-  journeyTimeline,
-  loading = false,
+  journeyTimeline: controlledData,
+  loading: controlledLoading = false,
+  error: controlledError = null,
+  onReload: controlledReload,
+  standalone = false,
+  standaloneOptions,
+  showControls = true,
 }: JourneyTimelineTabProps) {
-  if (loading && !journeyTimeline) {
+  const standaloneHook = useJourneyTimeline(standalone ? { autoLoad: true, ...standaloneOptions } : { autoLoad: false });
+
+  const data = standalone ? standaloneHook.data : controlledData;
+  const loading = standalone ? standaloneHook.loading : controlledLoading;
+  const error = standalone ? standaloneHook.error : controlledError;
+  const handleReload = standalone ? standaloneHook.reload : controlledReload;
+  const dateRange = standalone ? standaloneHook.dateRange : null;
+  const setDateRange = standalone ? standaloneHook.setDateRange : null;
+
+  if (loading && !data) {
     return (
       <div className="card p-12 text-center text-dark-400">
         <div className="animate-spin w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full mx-auto mb-3" />
@@ -55,23 +87,106 @@ export function JourneyTimelineTab({
     );
   }
 
-  if (!journeyTimeline) {
+  if (error && !data) {
     return (
       <div className="card p-12 text-center text-dark-400">
-        暂无旅程时间线数据
+        <AlertTriangle className="w-8 h-8 text-warning-400 mx-auto mb-3" />
+        <p className="mb-2">{error}</p>
+        {handleReload && (
+          <button
+            onClick={handleReload}
+            className="px-4 py-2 rounded-lg bg-brand-gradient text-white text-sm font-medium hover:opacity-90 transition-opacity"
+          >
+            <RefreshCw className="w-4 h-4 inline mr-2" />
+            重试
+          </button>
+        )}
       </div>
     );
   }
 
+  if (!data) {
+    return (
+      <div className="card p-12 text-center text-dark-400">
+        <AlertTriangle className="w-8 h-8 text-warning-400 mx-auto mb-3" />
+        <p className="mb-2">暂无旅程时间线数据</p>
+        {handleReload && (
+          <button
+            onClick={handleReload}
+            className="px-4 py-2 rounded-lg bg-brand-gradient text-white text-sm font-medium hover:opacity-90 transition-opacity mt-2"
+          >
+            <RefreshCw className="w-4 h-4 inline mr-2" />
+            刷新数据
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const isEmpty = isDataEmpty(data);
+
   const summaryCards = [
-    { label: "总旅程数", value: journeyTimeline.totalJourneys, icon: Users, color: "from-brand-500 to-accent-500" },
-    { label: "已转化旅程", value: journeyTimeline.convertedJourneys, icon: Target, color: "from-success-500 to-accent-500" },
-    { label: "平均转化步骤", value: journeyTimeline.avgStepsToConversion.toFixed(1), icon: GitBranch, color: "from-warning-500 to-brand-500" },
-    { label: "平均曝光次数", value: journeyTimeline.avgExposuresBeforeConversion.toFixed(1), icon: Eye, color: "from-accent-500 to-success-500" },
+    { label: "总旅程数", value: data.totalJourneys, icon: Users, color: "from-brand-500 to-accent-500" },
+    { label: "已转化旅程", value: data.convertedJourneys, icon: Target, color: "from-success-500 to-accent-500" },
+    { label: "平均转化步骤", value: isEmpty ? "-" : data.avgStepsToConversion.toFixed(1), icon: GitBranch, color: "from-warning-500 to-brand-500" },
+    { label: "平均曝光次数", value: isEmpty ? "-" : data.avgExposuresBeforeConversion.toFixed(1), icon: Eye, color: "from-accent-500 to-success-500" },
   ];
 
   return (
     <div className="space-y-6">
+      {standalone && showControls && dateRange && setDateRange && (
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-dark-400">
+              <Calendar className="w-4 h-4" />
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                className="input py-1.5 px-3 text-sm w-auto"
+              />
+              <span>至</span>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                className="input py-1.5 px-3 text-sm w-auto"
+              />
+            </div>
+            <button className="btn-ghost">
+              <Filter className="w-4 h-4" />
+              筛选
+            </button>
+          </div>
+          {handleReload && (
+            <button onClick={handleReload} className="btn-secondary" title="刷新数据">
+              <RefreshCw className="w-4 h-4" />
+              刷新
+            </button>
+          )}
+        </div>
+      )}
+
+      {isEmpty && (
+        <div className="card p-10 text-center">
+          <GitBranch className="w-12 h-12 text-dark-600 mx-auto mb-4" />
+          <h3 className="text-white font-medium mb-2">暂无完整旅程数据</h3>
+          <p className="text-dark-400 text-sm mb-4">
+            当前数据中还没有完整的用户旅程。旅程时间线需要结合曝光、扫码和转化三类数据来追踪用户从首次触达到最终转化的全过程。
+            请先积累相关数据后再查看。
+          </p>
+          {handleReload && (
+            <button
+              onClick={handleReload}
+              className="px-4 py-2 rounded-lg bg-brand-gradient text-white text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              <RefreshCw className="w-4 h-4 inline mr-2" />
+              重新加载
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {summaryCards.map((card, i) => (
           <div key={i} className="stat-card animate-fade-up" style={{ animationDelay: `${i * 60}ms` }}>
@@ -90,14 +205,14 @@ export function JourneyTimelineTab({
         ))}
       </div>
 
-      {journeyTimeline.commonPatterns.length > 0 && (
+      {data.commonPatterns.length > 0 && (
         <div className="card p-5">
           <h3 className="font-semibold text-white flex items-center gap-2 mb-4">
             <GitBranch className="w-4 h-4 text-brand-400" />
             常见旅程模式
           </h3>
           <div className="space-y-3">
-            {journeyTimeline.commonPatterns.map((pattern, i) => (
+            {data.commonPatterns.map((pattern, i) => (
               <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-dark-800/50 hover:bg-dark-800 transition-colors">
                 <span className="w-7 h-7 rounded-lg bg-dark-700 flex items-center justify-center text-xs font-bold text-dark-400">
                   {i + 1}
@@ -122,100 +237,103 @@ export function JourneyTimelineTab({
         </div>
       )}
 
-      <div className="card overflow-hidden">
-        <div className="px-5 py-4 border-b border-dark-700">
-          <h3 className="font-semibold text-white flex items-center gap-2">
-            <Clock className="w-4 h-4 text-brand-400" />
-            完整旅程时间线
-          </h3>
-        </div>
-        <div className="divide-y divide-dark-700">
-          {journeyTimeline.journeys.map((journey) => (
-            <div key={journey.visitorId} className="p-5 hover:bg-dark-800/30 transition-colors">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-brand-gradient flex items-center justify-center text-white font-bold text-sm">
-                    {journey.visitorId.slice(-2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-medium">访客 {journey.visitorId.slice(0, 8)}...</span>
-                      {journey.conversion ? (
-                        <span className="tag-green flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          已转化
-                        </span>
-                      ) : (
-                        <span className="tag-gray flex items-center gap-1">
-                          <XCircle className="w-3 h-3" />
-                          未转化
-                        </span>
-                      )}
+      {data.journeys.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-5 py-4 border-b border-dark-700">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <Clock className="w-4 h-4 text-brand-400" />
+              完整旅程时间线
+              <span className="tag-gray ml-2">共 {data.journeys.length} 条</span>
+            </h3>
+          </div>
+          <div className="divide-y divide-dark-700">
+            {data.journeys.map((journey) => (
+              <div key={journey.visitorId} className="p-5 hover:bg-dark-800/30 transition-colors">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-brand-gradient flex items-center justify-center text-white font-bold text-sm">
+                      {journey.visitorId.slice(-2).toUpperCase()}
                     </div>
-                    <div className="text-xs text-dark-500 mt-1 flex items-center gap-3">
-                      <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {journey.totalExposures} 曝光</span>
-                      <span className="flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> {journey.totalScans} 扫码</span>
-                      {journey.journeyDurationMinutes !== undefined && (
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {journey.journeyDurationMinutes} 分钟</span>
-                      )}
-                      {journey.conversion && (
-                        <span className="text-brand-400">价值: ¥{journey.conversion.eventValue?.toLocaleString() || "1"}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative ml-4">
-                <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-dark-700" />
-                <div className="space-y-3">
-                  {journey.steps.map((step: FullJourneyStep, i: number) => (
-                    <div key={step.id} className="flex items-start gap-3 relative">
-                      <div className="w-4 h-4 rounded-full bg-dark-800 border-2 border-dark-600 flex items-center justify-center z-10 mt-0.5 flex-shrink-0"
-                        style={{
-                          borderColor: step.stepType === "conversion" ? "#52C41A" : step.stepType === "scan" ? "#1677FF" : "#FAAD14",
-                        }}
-                      >
-                        <div className="w-1.5 h-1.5 rounded-full"
-                          style={{
-                            backgroundColor: step.stepType === "conversion" ? "#52C41A" : step.stepType === "scan" ? "#1677FF" : "#FAAD14",
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <StepIcon stepType={step.stepType} />
-                          <StepBadge stepType={step.stepType} />
-                          <span className="text-white text-sm font-medium">
-                            {step.stepType === "conversion"
-                              ? step.eventType
-                              : step.channel || step.qrcodeName || "未知"}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-white font-medium">访客 {journey.visitorId.slice(0, 8)}...</span>
+                        {journey.conversion ? (
+                          <span className="tag-green flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            已转化
                           </span>
-                          {step.stepType === "exposure" && step.exposureType && (
-                            <span className="text-xs text-dark-500">({step.exposureType})</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-dark-500 mt-0.5">
-                          {new Date(step.timestamp).toLocaleString("zh-CN", {
-                            month: "2-digit",
-                            day: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          })}
-                          {step.stepType === "conversion" && step.eventValue && (
-                            <span className="ml-2 text-brand-400">¥{step.eventValue.toLocaleString()}</span>
-                          )}
-                        </div>
+                        ) : (
+                          <span className="tag-gray flex items-center gap-1">
+                            <XCircle className="w-3 h-3" />
+                            未转化
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-dark-500 mt-1 flex items-center gap-3">
+                        <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {journey.totalExposures} 曝光</span>
+                        <span className="flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> {journey.totalScans} 扫码</span>
+                        {journey.journeyDurationMinutes !== undefined && (
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {journey.journeyDurationMinutes} 分钟</span>
+                        )}
+                        {journey.conversion && (
+                          <span className="text-brand-400">价值: ¥{journey.conversion.eventValue?.toLocaleString() || "1"}</span>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  </div>
+                </div>
+
+                <div className="relative ml-4">
+                  <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-dark-700" />
+                  <div className="space-y-3">
+                    {journey.steps.map((step: FullJourneyStep, i: number) => (
+                      <div key={step.id} className="flex items-start gap-3 relative">
+                        <div className="w-4 h-4 rounded-full bg-dark-800 border-2 border-dark-600 flex items-center justify-center z-10 mt-0.5 flex-shrink-0"
+                          style={{
+                            borderColor: step.stepType === "conversion" ? "#52C41A" : step.stepType === "scan" ? "#1677FF" : "#FAAD14",
+                          }}
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full"
+                            style={{
+                              backgroundColor: step.stepType === "conversion" ? "#52C41A" : step.stepType === "scan" ? "#1677FF" : "#FAAD14",
+                            }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <StepIcon stepType={step.stepType} />
+                            <StepBadge stepType={step.stepType} />
+                            <span className="text-white text-sm font-medium">
+                              {step.stepType === "conversion"
+                                ? step.eventType
+                                : step.channel || step.qrcodeName || "未知"}
+                            </span>
+                            {step.stepType === "exposure" && step.exposureType && (
+                              <span className="text-xs text-dark-500">({step.exposureType})</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-dark-500 mt-0.5">
+                            {new Date(step.timestamp).toLocaleString("zh-CN", {
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })}
+                            {step.stepType === "conversion" && step.eventValue && (
+                              <span className="ml-2 text-brand-400">¥{step.eventValue.toLocaleString()}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

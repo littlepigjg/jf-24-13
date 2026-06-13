@@ -26,11 +26,11 @@ export interface UseAttributionDataReturn {
   setSelectedModel: (model: AttributionModel) => void;
   setDateRange: (range: { start: string; end: string }) => void;
   reloadOverview: () => Promise<void>;
-  reloadAttribution: () => Promise<void>;
-  reloadChannelContributions: () => Promise<void>;
-  reloadModelComparison: () => Promise<void>;
-  reloadJourneyTimeline: () => Promise<void>;
-  reloadAll: () => Promise<void>;
+  reloadAttribution: (model?: AttributionModel, range?: { start: string; end: string }) => Promise<void>;
+  reloadChannelContributions: (model?: AttributionModel, range?: { start: string; end: string }) => Promise<void>;
+  reloadModelComparison: (range?: { start: string; end: string }) => Promise<void>;
+  reloadJourneyTimeline: (range?: { start: string; end: string }) => Promise<void>;
+  reloadAll: (model?: AttributionModel, range?: { start: string; end: string }) => Promise<void>;
   clearError: () => void;
 }
 
